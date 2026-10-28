@@ -15,9 +15,9 @@ from pm3trainer.game import GameAborted, build_challenges, run_game
 from pm3trainer.session import Pm3Disconnected, Pm3Timeout
 from pm3trainer.testing import FakeSession
 
-LF_SEARCH_OUT = "[+] Valid T55xx tag found\n"
-HF_SEARCH_OUT = "[+] ISO14443-a Information\n[+] Valid Mifare Classic tag found\n"
-T55_DETECT_OUT = "[=] Chip Type      : T55x7\n[=] Password set   : No\n"
+LF_SEARCH_OUT = "[+] EM 410x ID 340073B7A4\n[+] Valid EM410x ID found!\n[+] Chipset... T55xx\n"
+NO_LF_OUT = "[-] No known 125/134 kHz tags found!\n"
+T55_DETECT_OUT = "[=]  Chip type......... T55x7\n[=]  Password set...... No\n"
 
 
 class StubCreate(Challenge):
@@ -56,10 +56,12 @@ def make_responses(search=LF_SEARCH_OUT, on_cmd=None):
     def respond(cmd):
         if on_cmd is not None:
             on_cmd(cmd)
-        if cmd == cards.SEARCH_CMD:
-            return search() if callable(search) else search
+        if cmd == cards.LF_SEARCH_CMD:
+            state["search"] = search() if callable(search) else search
+            return state["search"]
         if cmd == cards.T5577_INFO_CMD:
-            return T55_DETECT_OUT
+            # Detect only succeeds when a T5577 is actually on the antenna.
+            return T55_DETECT_OUT if state.get("search") == LF_SEARCH_OUT else ""
         if cmd.startswith("write "):
             state["data"] = cmd[len("write "):]
             return "ok"
@@ -161,15 +163,15 @@ def test_guard_block_prevents_send_and_reloops():
 
 
 def test_wrong_card_reprompts_before_clock():
-    outputs = iter([HF_SEARCH_OUT, LF_SEARCH_OUT])
+    outputs = iter([NO_LF_OUT, LF_SEARCH_OUT])
     session = FakeSession(make_responses(search=lambda: next(outputs)))
     h = Harness(session, ["", "", "write GOOD"], clock_values=[5.0, 9.0])
     results = h.run([StubCreate()])
     assert len(results) == 1
-    assert session.sent.count(cards.SEARCH_CMD) == 2
-    # clock() is first read only after both card checks (auto, auto, detect) ran
-    assert h.clock_calls[0] == 3
-    assert "HF" in h.printed  # the wrong-card detail was shown
+    assert session.sent.count(cards.LF_SEARCH_CMD) == 2
+    # clock() is first read only after both card checks (search+detect, twice) ran
+    assert h.clock_calls[0] == 4
+    assert "No T5577" in h.printed  # the wrong-card detail was shown
 
 
 def test_read_challenge_setup_writes_and_checks_answer():

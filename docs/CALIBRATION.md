@@ -24,7 +24,7 @@ done, expect commands/parsers to need tuning.
 
 | Area | File | Constants / patterns |
 |------|------|----------------------|
-| LF/HF + chip detection | `pm3trainer/cards.py` | `SEARCH_CMD` (`"auto"`), `T5577_INFO_CMD`, `MAGIC_INFO_CMD`, `ICLASS_INFO_CMD`, chip + password regexes |
+| LF/HF + chip detection | `pm3trainer/cards.py` | `LF_SEARCH_CMD`, `HF_SEARCH_CMD`, `T5577_INFO_CMD`, `MAGIC_INFO_CMD`, `ICLASS_INFO_CMD`, chip + password regexes |
 | Output parsing | `pm3trainer/parsers.py` | `parse_hid`, `parse_em410x`, `parse_mifare_uid`, `parse_iclass_block`, `parse_search_kind` |
 | HID create | `pm3trainer/challenges/lf_hid_create.py` | read cmd + `lf hid clone` template |
 | EM create/read | `lf_em_create.py` (`CLONE_TEMPLATE`, read cmd) — `lf_em_read.py` imports `CLONE_TEMPLATE` |
@@ -40,9 +40,12 @@ done, expect commands/parsers to need tuning.
   you can actually write, and add the key option to `READ_TEMPLATE` /
   `WRITE_TEMPLATE`. If a template gains format fields beyond `{block}` /
   `{data}`, update `check()` and the test `.format()` calls too.
-- **`parse_search_kind` input:** `SEARCH_CMD = "auto"` — confirm `auto`'s
-  output actually contains LF/HF markers the parser looks for; if not, use
-  `lf search` / `hf search` per band.
+- **Card detection (T5577 calibrated):** detection uses `lf search` /
+  `hf search` per band. A T5577 is recognized from `lf search`'s
+  `Chipset... T55xx` line (confirmed on a real Iceman client) or from
+  `lf t55xx detect`'s `Chip type......... T55x7` line for blank cards.
+  Confirm `hf search` output still contains the HF markers
+  `parse_search_kind` looks for.
 - **Negation heuristic:** `parse_search_kind` and `cards._matches` skip any
   line containing `no` / `not` / `invalid` / `failed`. It fails *closed*
   (re-prompt, never a false positive), but check no real positive line
