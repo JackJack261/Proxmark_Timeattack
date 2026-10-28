@@ -85,3 +85,34 @@ def test_parsers_strip_ansi_before_matching():
     assert parse_mifare_uid(wrap(MF_OUT)) == "04a1b2c3d4e5f6"
     assert parse_iclass_block(wrap(ICLASS_OUT), 6) == "123456789abcdef0"
     assert parse_search_kind(wrap(LF_SEARCH)) == "LF"
+
+
+def test_parse_search_kind_ignores_negated_lines():
+    assert parse_search_kind("[-] Invalid EM410x ID") is None
+    assert parse_search_kind("[!] No iCLASS tag found") is None
+    assert parse_search_kind("[-] no PicoPass tag detected") is None
+
+
+def test_parse_search_kind_conflict_returns_none():
+    assert parse_search_kind(LF_SEARCH + HF_SEARCH) is None
+
+
+def test_parse_mifare_uid_rejects_bad_lengths():
+    assert parse_mifare_uid("[+]  UID: bad") is None
+    assert parse_mifare_uid("[+]  UID: cafe") is None
+    assert parse_mifare_uid("[+]  UID: 04 A1 B2 C3 D4 E5 F\n[+] ATQA: 00 44") is None
+    assert parse_mifare_uid("[+]  UID: 04 A1 B2 C3 D") is None
+    assert parse_mifare_uid("[+]  UID: 04 A1 B2 C3 D4 E5") is None  # 6 bytes
+    assert parse_mifare_uid("[+]  UID: 04 A1 B2 C3\n[+] ATQA: 00 44") == "04a1b2c3"
+    assert parse_mifare_uid("[+]  UID: 04A1B2C3 ATQA: 00 44") == "04a1b2c3"
+
+
+def test_parse_iclass_block_rejects_long_row():
+    row = "[=] block 06/0x06 : 12 34 56 78 9A BC DE F0 11\n"
+    assert parse_iclass_block(row, 6) is None
+    assert parse_iclass_block("[=] block 06/0x06 : 12 34 56 78 9A BC DE\n", 6) is None
+
+
+def test_parse_hid_ansi_between_label_and_value():
+    text = "FC: \x1b[33m240\x1b[0m  CN: \x1b[33m2772\x1b[0m"
+    assert parse_hid(text) == HidResult(240, 2772)
