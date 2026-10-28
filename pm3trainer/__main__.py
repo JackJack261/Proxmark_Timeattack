@@ -40,11 +40,15 @@ def print_results(results, output_fn=print) -> None:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="pm3trainer", description="Proxmark3 time-attack trainer")
     parser.add_argument("--port", default=None, help="serial port, e.g. /dev/ttyACM0")
+    parser.add_argument(
+        "--log", default=None, metavar="FILE",
+        help="append every pm3 command and its raw output to FILE (for troubleshooting)",
+    )
     return parser.parse_args(argv)
 
 
 def _play(args: argparse.Namespace) -> int:
-    session = Pm3Session(port=args.port)
+    session = Pm3Session(port=args.port, log_path=args.log)
     try:
         try:
             session.start()

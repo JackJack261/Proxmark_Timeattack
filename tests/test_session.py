@@ -1,3 +1,5 @@
+import re
+
 import pexpect
 import pytest
 
@@ -15,9 +17,13 @@ class StubChild:
         self.before = ""
         self.sent = []
         self.closed = False
+        self.buffer = ""
 
     def sendline(self, line):
         self.sent.append(line)
+
+    def read_nonblocking(self, size, timeout=None):
+        raise pexpect.TIMEOUT("idle")
 
     def expect(self, pattern, timeout=None):
         if self._raises is not None:
@@ -65,3 +71,82 @@ def test_run_raises_timeout(monkeypatch):
     s = _session_with(monkeypatch, StubChild(raises=pexpect.TIMEOUT("slow")))
     with pytest.raises(Pm3Timeout):
         s.run("hw status", timeout=0.1)
+
+
+# The Iceman prompt as it reaches the pty (bracketed-paste on, green "usb").
+PROMPT = "\x1b[?2004h[\x1b[1;32musb\x1b[0m] pm3 --> "
+
+
+class StreamChild:
+    """Byte-stream stand-in: replies arrive as text followed by a prompt."""
+
+    def __init__(self, replies, buffer="", incoming=""):
+        self.replies = replies
+        self.buffer = buffer        # unmatched data left by the previous expect
+        self._incoming = incoming   # data the client wrote but not yet read
+        self.before = ""
+        self.sent = []
+
+    def sendline(self, line):
+        self.sent.append(line)
+        self._incoming += line + "\r\n" + self.replies[line] + PROMPT
+
+    def read_nonblocking(self, size, timeout=None):
+        if not self._incoming:
+            raise pexpect.TIMEOUT("idle")
+        data, self._incoming = self._incoming, ""
+        return data
+
+    def expect(self, pattern, timeout=None):
+        self.buffer += self._incoming
+        self._incoming = ""
+        m = re.search(pattern, self.buffer)
+        if m is None:
+            raise pexpect.TIMEOUT("no prompt")
+        self.before, self.buffer = self.buffer[:m.start()], self.buffer[m.end():]
+        return 0
+
+    def close(self, force=True):
+        pass
+
+
+def test_run_matches_real_prompt():
+    s = Pm3Session()
+    s._child = StreamChild({"lf hid reader": "[+] FC: 1  CN: 2\r\n"})
+    assert s.run("lf hid reader") == "[+] FC: 1  CN: 2"
+
+
+def test_run_discards_redrawn_prompt_so_outputs_stay_in_step():
+    # The client redrew its prompt while idle (device message at the prompt):
+    # one copy is already buffered, another is still unread on the pty.
+    replies = {
+        "lf hid clone -w H10301 --fc 215 --cn 31667": "[+] Done!\r\n",
+        "lf hid reader": "[+] [H10301  ] HID H10301 26-bit  FC: 215  CN: 31667\r\n",
+    }
+    child = StreamChild(replies, buffer="\r\n" + PROMPT, incoming="\r\n" + PROMPT)
+    s = Pm3Session()
+    s._child = child
+    assert s.run("lf hid clone -w H10301 --fc 215 --cn 31667") == "[+] Done!"
+    assert "CN: 31667" in s.run("lf hid reader")
+
+
+def test_run_raises_disconnected_on_eof_while_draining():
+    class EofChild(StubChild):
+        def read_nonblocking(self, size, timeout=None):
+            raise pexpect.EOF("gone")
+
+    s = Pm3Session()
+    s._child = EofChild()
+    with pytest.raises(Pm3Disconnected):
+        s.run("hw status")
+
+
+def test_log_records_commands_and_raw_output(tmp_path):
+    log = tmp_path / "pm3.log"
+    s = Pm3Session(log_path=str(log))
+    s._child = StreamChild({"lf search": "[+] Chipset... T55xx\r\n"}, incoming="stale\r\n")
+    s.run("lf search")
+    text = log.read_text()
+    assert "discarded stale output" in text and "stale" in text
+    assert ">>> lf search" in text
+    assert "Chipset... T55xx" in text

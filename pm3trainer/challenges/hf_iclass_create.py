@@ -37,4 +37,10 @@ class HfIclassCreate(Challenge):
     def check(self, session, player_input: Optional[str]) -> bool:
         output = session.run(READ_TEMPLATE.format(block=BLOCK))
         found = parse_iclass_block(output, BLOCK)
-        return found is not None and norm_hex(found) == norm_hex(self.data)
+        if found is not None and norm_hex(found) == norm_hex(self.data):
+            return True
+        self.feedback = (
+            f"Block {BLOCK} reads as {found.upper()}." if found
+            else f"Block {BLOCK} could not be read from the card."
+        )
+        return False

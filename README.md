@@ -25,10 +25,12 @@ The write challenges need rewritable cards:
 ## Run
 
 ```
-python3 pm3trainer.py [--port /dev/ttyACM0]
+python3 pm3trainer.py [--port /dev/ttyACM0] [--log pm3.log]
 ```
 
 `--port` is optional; without it the `pm3` client picks the device itself.
+`--log FILE` appends every command the game sends and the client's raw output
+to `FILE`, which helps when a check doesn't behave as expected.
 Your best total time is saved to `scores.json` in the directory you run from.
 
 ## The challenges

@@ -141,6 +141,22 @@ def test_create_challenge_retries_until_correct():
     assert [c for c in session.sent if c.startswith("write ")] == ["write BAD", "write GOOD"]
 
 
+class StubFeedback(StubCreate):
+    def check(self, session, player_input):
+        data = session.run("readback").strip()
+        if data != "GOOD":
+            self.feedback = f"The card reads as {data}."
+        return data == "GOOD"
+
+
+def test_wrong_attempt_shows_challenge_feedback():
+    session = FakeSession(make_responses())
+    h = Harness(session, ["", "write BAD", "write GOOD"])
+    h.run([StubFeedback()])
+    assert "The card reads as BAD." in h.out
+    assert h.printed.count("The card reads as") == 1
+
+
 def test_guard_block_prevents_send_and_reloops():
     session = FakeSession(make_responses())
     blocked = "lf t55xx read -p 11223344"

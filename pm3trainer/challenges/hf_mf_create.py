@@ -31,4 +31,10 @@ class HfMfCreate(Challenge):
 
     def check(self, session, player_input: Optional[str]) -> bool:
         found = parse_mifare_uid(session.run(READ_COMMAND))
-        return found is not None and norm_hex(found) == norm_hex(self.uid)
+        if found is not None and norm_hex(found) == norm_hex(self.uid):
+            return True
+        self.feedback = (
+            f"The card reads as UID {found.upper()}." if found
+            else f"No UID could be read from the card ('{READ_COMMAND}')."
+        )
+        return False

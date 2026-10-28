@@ -31,4 +31,10 @@ class LfEmCreate(Challenge):
 
     def check(self, session, player_input: Optional[str]) -> bool:
         found = parse_em410x(session.run(READ_COMMAND))
-        return found is not None and norm_hex(found) == norm_hex(self.em_id)
+        if found is not None and norm_hex(found) == norm_hex(self.em_id):
+            return True
+        self.feedback = (
+            f"The card reads as EM410x ID {found.upper()}." if found
+            else f"No EM410x ID could be read from the card ('{READ_COMMAND}')."
+        )
+        return False

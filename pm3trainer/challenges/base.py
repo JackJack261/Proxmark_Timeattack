@@ -24,6 +24,9 @@ class Challenge:
 
     ``hints`` are ordered (first a nudge, last roughly the command with
     placeholders); ``solution`` is shown on pass. The game loop consumes both.
+
+    ``check`` may set ``feedback`` to say what the card actually held; the game
+    shows it after a wrong attempt.
     """
 
     name: str
@@ -33,6 +36,7 @@ class Challenge:
     task_prompt: str
     hints: list[str]
     solution: str
+    feedback: str = ""
 
     def setup(self, session) -> None:
         """Prepare the card before the player answers. Default: nothing."""

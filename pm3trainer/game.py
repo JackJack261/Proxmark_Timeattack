@@ -107,6 +107,7 @@ def _play(session, challenge, *, input_fn, output_fn, clock) -> ChallengeResult:
         if not line:
             continue
 
+        challenge.feedback = ""
         try:
             if challenge.mode is Mode.CREATE:
                 verdict = guard.check(line, card_state)
@@ -125,6 +126,8 @@ def _play(session, challenge, *, input_fn, output_fn, clock) -> ChallengeResult:
             output_fn("Correct!")
             break
         output_fn("Not quite. Try again.")
+        if challenge.feedback:
+            output_fn(challenge.feedback)
 
     elapsed = clock() - start
     return ChallengeResult(challenge.name, elapsed, hints_used, skipped)

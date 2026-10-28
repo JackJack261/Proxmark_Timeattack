@@ -50,6 +50,11 @@ def parse_hid(text: str) -> Optional[HidResult]:
     return HidResult(int(m.group(1)), int(m.group(2)))
 
 
+def parse_hid_all(text: str) -> list[HidResult]:
+    """Every FC/CN pair; the client prints one line per matching Wiegand format."""
+    return [HidResult(int(fc), int(cn)) for fc, cn in _HID_RE.findall(strip_ansi(text))]
+
+
 def parse_em410x(text: str) -> Optional[str]:
     m = _EM410X_RE.search(strip_ansi(text))
     return m.group(1).lower() if m else None

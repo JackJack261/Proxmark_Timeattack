@@ -9,8 +9,9 @@ class FakeSession:
     instances = []
     start_error = None
 
-    def __init__(self, port=None):
+    def __init__(self, port=None, log_path=None):
         self.port = port
+        self.log_path = log_path
         self.started = False
         self.closed = False
         FakeSession.instances.append(self)
@@ -49,6 +50,16 @@ def test_main_parses_port_arg(monkeypatch):
     monkeypatch.setattr(entry, "run_game", stop)
     entry.main(["--port", "/dev/ttyACM1"])
     assert FakeSession.instances[0].port == "/dev/ttyACM1"
+    assert FakeSession.instances[0].log_path is None
+
+
+def test_main_parses_log_arg(monkeypatch):
+    def stop(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(entry, "run_game", stop)
+    entry.main(["--log", "pm3.log"])
+    assert FakeSession.instances[0].log_path == "pm3.log"
 
 
 def test_main_handles_keyboard_interrupt(monkeypatch, capsys):

@@ -47,6 +47,26 @@ def test_check_fails_when_nothing_readable():
     c = _make()
     session = FakeSession({READ_COMMAND: "[!] No data found!\n"})
     assert c.check(session, None) is False
+    assert "No HID credential" in c.feedback
+
+
+def test_check_feedback_names_what_the_card_holds():
+    c = _make()
+    session = FakeSession({READ_COMMAND: _reader_output(c.fc, (c.cn + 1) % 65536)})
+    assert c.check(session, None) is False
+    assert c.feedback == f"The card reads as FC {c.fc} CN {(c.cn + 1) % 65536}."
+
+
+def test_check_passes_on_real_multi_format_output():
+    # Real Iceman `lf hid reader`: one line per Wiegand format that decodes.
+    c = _make()
+    out = (
+        "[+] [ind26   ] Indala 26-bit                  FC: 12  CN: 4321  parity ( ok )\n"
+        f"[+] [H10301  ] HID H10301 26-bit              FC: {c.fc}  CN: {c.cn}  parity ( ok )\n"
+        "[=] found 2 matching 26-bit formats\n"
+        "[=] raw: 000000000000002006ec0c86\n"
+    )
+    assert c.check(FakeSession({READ_COMMAND: out}), None) is True
 
 
 def test_has_hints_and_solution():

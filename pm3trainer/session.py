@@ -22,6 +22,8 @@ _ANSI = r"(?:\x1b\[[0-9;]*m)*"
 PROMPT_RE = rf"\[{_ANSI}usb{_ANSI}\] pm3 -->"
 
 _STARTUP_TIMEOUT = 30.0
+# How long to wait for more stale output while draining before a command.
+_DRAIN_TIMEOUT = 0.1
 
 
 def _spawn(cmd: list[str]):
@@ -33,8 +35,9 @@ def _spawn(cmd: list[str]):
 
 
 class Pm3Session:
-    def __init__(self, port: Optional[str] = None):
+    def __init__(self, port: Optional[str] = None, log_path: Optional[str] = None):
         self.port = port
+        self.log_path = log_path
         self._child = None
 
     def start(self) -> None:
@@ -45,8 +48,12 @@ class Pm3Session:
     def run(self, cmd: str, timeout: float = 20.0) -> str:
         if self._child is None:
             raise Pm3Disconnected("session not started")
+        stale = self._drain()
+        if stale.strip():
+            self._log(f"--- discarded stale output ---\n{stale!r}\n")
         self._child.sendline(cmd)
         self._expect_prompt(timeout)
+        self._log(f">>> {cmd}\n{self._child.before!r}\n")
         return self._clean(self._child.before, cmd)
 
     def close(self) -> None:
@@ -55,6 +62,32 @@ class Pm3Session:
                 self._child.close(force=True)
             finally:
                 self._child = None
+
+    def _drain(self) -> str:
+        """Discard output that arrived after the last prompt.
+
+        The client can redraw its prompt when the device prints while it is
+        idle at the prompt. Left in the buffer, that extra prompt would end the
+        next command's read early and shift every later output by one command.
+        """
+        stale = [self._child.buffer]
+        self._child.buffer = ""
+        while True:
+            try:
+                stale.append(self._child.read_nonblocking(65536, timeout=_DRAIN_TIMEOUT))
+            except pexpect.TIMEOUT:
+                return "".join(stale)
+            except pexpect.EOF as e:
+                raise Pm3Disconnected("pm3 client exited") from e
+
+    def _log(self, text: str) -> None:
+        if self.log_path is None:
+            return
+        try:
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                f.write(text)
+        except OSError:
+            pass
 
     def _expect_prompt(self, timeout: float) -> None:
         try:
