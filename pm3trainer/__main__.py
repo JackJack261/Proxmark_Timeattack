@@ -12,7 +12,7 @@ from pm3trainer.scoring import (
     total_seconds,
 )
 from pm3trainer.session import Pm3Disconnected, Pm3Session
-from pm3trainer.ui import show_title_screen
+from pm3trainer.ui import fullscreen, show_title_screen, wait_for_enter
 
 SCORES_PATH = "scores.json"
 
@@ -43,10 +43,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str]) -> int:
-    args = parse_args(argv)
-    if sys.stdin.isatty() and sys.stdout.isatty():
-        show_title_screen()
+def _play(args: argparse.Namespace) -> int:
     session = Pm3Session(port=args.port)
     try:
         try:
@@ -88,6 +85,20 @@ def main(argv: list[str]) -> int:
         return 130
     finally:
         session.close()
+
+
+def main(argv: list[str]) -> int:
+    args = parse_args(argv)
+    interactive = sys.stdin.isatty() and sys.stdout.isatty()
+    if not interactive:
+        return _play(args)
+    # Hold the full-screen view across the whole game, not just the title.
+    with fullscreen():
+        show_title_screen()
+        code = _play(args)
+        if code != 130:  # the player didn't Ctrl-C out: let them read the screen
+            wait_for_enter()
+    return code
 
 
 if __name__ == "__main__":

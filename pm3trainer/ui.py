@@ -1,10 +1,13 @@
-"""Title screen shown when the game launches.
+"""Title screen and full-screen helpers for the launcher.
 
-Full-screen, centered "PROXMARK TIME ATTACK" banner in orange with a slow-
-blinking "Press Enter to Start" prompt. The fancy path (alternate screen
-buffer + blink) runs only on a real terminal; on a non-TTY it degrades to a
-plain print + wait so tests and piped input never block or emit escape codes.
+A large, centered "PROXMARK / TIME ATTACK" banner in orange block letters with
+a slow-blinking "Press Enter to Start" prompt. The whole game runs inside the
+terminal's alternate screen buffer (see ``fullscreen``) so it does not drop
+back to the shell between the title and play; the shell is restored cleanly on
+exit. The fancy path runs only on a real terminal; on a non-TTY everything
+degrades to plain prints so tests and piped input never block or emit escapes.
 """
+import contextlib
 import shutil
 import sys
 
@@ -19,20 +22,50 @@ SHOW_CURSOR = "\033[?25h"
 CLEAR = "\033[2J\033[H"
 
 PROMPT = "Press Enter to Start"
+EXIT_PROMPT = "Press Enter to return to your shell..."
 BLINK_INTERVAL = 0.6  # seconds per on/off phase
+
+GLYPH_H = 5
+_GAP = " "
+# 5-row block glyphs (authored with '#', rendered as solid blocks).
+_FONT = {
+    "P": ["#### ", "#   #", "#### ", "#    ", "#    "],
+    "R": ["#### ", "#   #", "#### ", "#  # ", "#   #"],
+    "O": [" ### ", "#   #", "#   #", "#   #", " ### "],
+    "X": ["#   #", " # # ", "  #  ", " # # ", "#   #"],
+    "M": ["#   #", "## ##", "# # #", "#   #", "#   #"],
+    "A": [" ### ", "#   #", "#####", "#   #", "#   #"],
+    "K": ["#   #", "#  # ", "###  ", "#  # ", "#   #"],
+    "T": ["#####", "  #  ", "  #  ", "  #  ", "  #  "],
+    "I": ["#####", "  #  ", "  #  ", "  #  ", "#####"],
+    "E": ["#####", "#    ", "#### ", "#    ", "#####"],
+    "C": [" ####", "#    ", "#    ", "#    ", " ####"],
+    " ": ["     ", "     ", "     ", "     ", "     "],
+}
+
+
+def _render_word(word: str) -> list[str]:
+    """Render a word as GLYPH_H rows of block letters."""
+    rows = ["" for _ in range(GLYPH_H)]
+    chars = list(word.upper())
+    for i, ch in enumerate(chars):
+        glyph = _FONT.get(ch, _FONT[" "])
+        for r in range(GLYPH_H):
+            rows[r] += glyph[r]
+            if i != len(chars) - 1:
+                rows[r] += _GAP
+    return [row.replace("#", "█") for row in rows]
 
 
 def build_title_lines() -> list[str]:
-    """The framed, spaced title banner as a list of equal-width lines."""
-    title1 = "P R O X M A R K"
-    title2 = "T I M E   A T T A C K"
-    inner = max(len(title1), len(title2)) + 8
-    top = "╔" + "═" * inner + "╗"
-    bottom = "╚" + "═" * inner + "╝"
-    blank = "║" + " " * inner + "║"
-    line1 = "║" + title1.center(inner) + "║"
-    line2 = "║" + title2.center(inner) + "║"
-    return [top, blank, line1, line2, blank, bottom]
+    """The big two-word banner as a list of equal-width lines."""
+    word1 = _render_word("PROXMARK")
+    word2 = _render_word("TIME ATTACK")
+    width = max(len(word1[0]), len(word2[0]))
+    lines = [row.center(width) for row in word1]
+    lines.append(" " * width)
+    lines.extend(row.center(width) for row in word2)
+    return lines
 
 
 def _move(row: int, col: int) -> str:
@@ -54,12 +87,46 @@ def _layout(cols: int, rows: int):
     return lines, top_row, left_col, prompt_row, prompt_col
 
 
+@contextlib.contextmanager
+def fullscreen(stdout=None):
+    """Hold the terminal's alternate screen buffer for the whole game.
+
+    Entering clears to a blank full screen; leaving restores the shell and the
+    cursor. On a non-TTY it is a no-op so tests and pipes are unaffected.
+    """
+    stdout = stdout or sys.stdout
+    if not stdout.isatty():
+        yield
+        return
+    stdout.write(ALT_SCREEN_ON + CLEAR)
+    stdout.flush()
+    try:
+        yield
+    finally:
+        stdout.write(SHOW_CURSOR + ALT_SCREEN_OFF)
+        stdout.flush()
+
+
+def wait_for_enter(message: str = EXIT_PROMPT, *, stdout=None, input_fn=input) -> None:
+    """On a TTY, show a message and wait for Enter (so the last screen stays
+    readable before the alternate buffer is torn down). No-op on a non-TTY."""
+    stdout = stdout or sys.stdout
+    if not stdout.isatty():
+        return
+    stdout.write("\n" + ORANGE + message + RESET + "\n" + SHOW_CURSOR)
+    stdout.flush()
+    try:
+        input_fn()
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+
 def _blink_wait(stdout, stdin, prompt_row, prompt_col, interval) -> None:
     """Blink the prompt until the player presses Enter.
 
-    Uses select() so the prompt keeps toggling while we wait for input,
-    without raw-mode fiddling. Falls back to a plain blocking read where
-    select() on stdin is not supported (e.g. Windows consoles).
+    Uses select() so the prompt keeps toggling while we wait for input, without
+    raw-mode fiddling. Falls back to a plain blocking read where select() on
+    stdin is not supported (e.g. Windows consoles).
     """
     import select
 
@@ -84,12 +151,12 @@ def _blink_wait(stdout, stdin, prompt_row, prompt_col, interval) -> None:
 
 
 def show_title_screen(*, stdout=None, stdin=None, input_fn=input, interval=BLINK_INTERVAL) -> None:
-    """Show the title screen and return once the player presses Enter.
+    """Draw the centered banner and return once the player presses Enter.
 
-    On a TTY: takes over the full screen (alternate buffer), draws the
-    centered orange banner, and slow-blinks the prompt until Enter. On a
-    non-TTY: prints the banner once and waits via ``input_fn`` (no escape
-    codes, no blink), so it is safe under test capture and piped input.
+    Assumes it is already inside ``fullscreen`` on a TTY: it clears, draws the
+    orange banner, slow-blinks the prompt, then clears again so the game starts
+    on a fresh screen. On a non-TTY it prints the banner once and waits via
+    ``input_fn`` (no escapes, no blink).
     """
     stdout = stdout or sys.stdout
     stdin = stdin or sys.stdin
@@ -106,12 +173,10 @@ def show_title_screen(*, stdout=None, stdin=None, input_fn=input, interval=BLINK
 
     cols, rows = shutil.get_terminal_size(fallback=(80, 24))
     lines, top_row, left_col, prompt_row, prompt_col = _layout(cols, rows)
-    try:
-        stdout.write(ALT_SCREEN_ON + HIDE_CURSOR + CLEAR)
-        for i, line in enumerate(lines):
-            stdout.write(_move(top_row + i, left_col) + ORANGE + BOLD + line + RESET)
-        stdout.flush()
-        _blink_wait(stdout, stdin, prompt_row, prompt_col, interval)
-    finally:
-        stdout.write(SHOW_CURSOR + ALT_SCREEN_OFF)
-        stdout.flush()
+    stdout.write(HIDE_CURSOR + CLEAR)
+    for i, line in enumerate(lines):
+        stdout.write(_move(top_row + i, left_col) + ORANGE + BOLD + line + RESET)
+    stdout.flush()
+    _blink_wait(stdout, stdin, prompt_row, prompt_col, interval)
+    stdout.write(SHOW_CURSOR + CLEAR)  # fresh screen for the game, cursor back
+    stdout.flush()
