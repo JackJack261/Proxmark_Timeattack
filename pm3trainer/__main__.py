@@ -64,7 +64,6 @@ def main(argv: list[str]) -> int:
                 input_fn=input,
                 output_fn=print,
                 clock=time.monotonic,
-                scores=HighScores(SCORES_PATH),
             )
         except GameAborted as aborted:
             print("Game ended early.")
@@ -76,10 +75,12 @@ def main(argv: list[str]) -> int:
         scores = HighScores(SCORES_PATH)
         if scores.record(total_seconds(results)):
             print("New best time!")
+        elif scores.best() is None:
+            print("(Could not save your best time; check that the directory is writable.)")
         else:
             print(f"Best time to beat: {format_time(scores.best())}")
         return 0
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         print("\nQuit. Thanks for playing!")
         return 130
     finally:

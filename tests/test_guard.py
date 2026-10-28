@@ -37,3 +37,16 @@ def test_recognizes_pwd_long_flag():
 
 def test_guard_result_is_a_value_object():
     assert GuardResult(allowed=True, reason="") == GuardResult(True, "")
+
+
+def test_blocks_glued_short_password_flag():
+    cmd = "lf t55xx read -b 0 -p11223344"
+    for state in (False, None):
+        assert check(cmd, CardState(password_set=state)).allowed is False
+    assert check(cmd, CardState(password_set=True)).allowed is True
+
+
+def test_blocks_glued_long_password_flag():
+    cmd = "lf t55xx read --pwd11223344"
+    assert check(cmd, CardState(password_set=False)).allowed is False
+    assert check(cmd, CardState(password_set=True)).allowed is True

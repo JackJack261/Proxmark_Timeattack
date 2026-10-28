@@ -3,7 +3,8 @@ import re
 
 from pm3trainer.cards import CardKind
 from pm3trainer.challenges.base import Mode
-from pm3trainer.challenges.lf_em_read import WRITE_TEMPLATE, LfEmRead
+from pm3trainer.challenges.lf_em_create import CLONE_TEMPLATE
+from pm3trainer.challenges.lf_em_read import LfEmRead
 from pm3trainer.testing import FakeSession
 
 
@@ -23,7 +24,7 @@ def test_setup_writes_random_id_and_records_sent():
     assert len(session.sent) == 1
     m = re.fullmatch(r"lf em 410x clone --id ([0-9a-f]{10})", session.sent[0])
     assert m is not None
-    assert session.sent[0] == WRITE_TEMPLATE.format(id=m.group(1))
+    assert session.sent[0] == CLONE_TEMPLATE.format(id=m.group(1))
     assert len({_setup(seed)[1].sent[0] for seed in range(50)}) > 1
 
 

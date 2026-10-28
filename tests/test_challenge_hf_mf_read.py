@@ -3,7 +3,8 @@ import re
 
 from pm3trainer.cards import CardKind
 from pm3trainer.challenges.base import Mode
-from pm3trainer.challenges.hf_mf_read import WRITE_TEMPLATE, HfMfRead
+from pm3trainer.challenges.hf_mf_create import SET_UID_TEMPLATE
+from pm3trainer.challenges.hf_mf_read import HfMfRead
 from pm3trainer.testing import FakeSession
 
 
@@ -23,7 +24,7 @@ def test_setup_writes_random_uid():
     assert len(session.sent) == 1
     m = re.fullmatch(r"hf mf csetuid -u ([0-9a-f]{8})", session.sent[0])
     assert m is not None
-    assert session.sent[0] == WRITE_TEMPLATE.format(uid=m.group(1))
+    assert session.sent[0] == SET_UID_TEMPLATE.format(uid=m.group(1))
     assert c.solution == m.group(1)
     assert len({_setup(seed)[1].sent[0] for seed in range(50)}) > 1
 

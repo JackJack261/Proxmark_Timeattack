@@ -80,9 +80,11 @@ def _setup(session, challenge, input_fn, output_fn):
 def _play(session, challenge, *, input_fn, output_fn, clock) -> ChallengeResult:
     card_state = _present_card(session, challenge, input_fn, output_fn)
 
-    start = clock()
+    # READ challenges write their ground truth before the clock starts, so the
+    # player is never timed for the game's own silent write.
     if challenge.mode is Mode.READ:
         _setup(session, challenge, input_fn, output_fn)
+    start = clock()
     output_fn(challenge.task_prompt)
 
     hints_used = 0
@@ -135,12 +137,11 @@ def run_game(
     input_fn: Callable[[str], str],
     output_fn: Callable[[str], None],
     clock: Callable[[], float],
-    scores,
 ) -> list[ChallengeResult]:
     """Play every challenge in order and return the per-challenge results.
 
-    Raises GameAborted if the device disconnects. ``scores`` is accepted for the
-    entry point's convenience; recording the final total is left to the caller.
+    Raises GameAborted if the device disconnects. Recording the final total is
+    left to the caller.
     """
     results: list[ChallengeResult] = []
     try:

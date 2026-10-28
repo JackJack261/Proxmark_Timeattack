@@ -33,12 +33,12 @@ Your best total time is saved to `scores.json` in the directory you run from.
 
 ## The challenges
 
-1. **LF EM410x read** - read an EM410x tag and report its ID.
+1. **LF HID Prox create** - write a given HID Prox credential (facility code + card number) onto a T5577.
 2. **LF EM410x create** - write a given EM410x ID onto a T5577.
-3. **LF HID create** - write a given HID Prox credential onto a T5577.
-4. **HF Mifare Classic read** - read a Mifare Classic card and report the requested detail.
-5. **HF Mifare Classic create** - write a given UID onto a magic Mifare card.
-6. **HF iClass create** - write the given credential onto a writable iClass card.
+3. **HF Mifare Classic create** - write a given UID onto a magic Mifare card.
+4. **HF iClass create** - write the given credential onto a writable iClass card.
+5. **LF EM410x read** - the game writes an EM410x ID to a T5577; read it and report the ID.
+6. **HF Mifare UID read** - the game sets a UID on a magic Mifare card; read it and report the UID.
 
 Your final score is the total time across all challenges, penalties included.
 

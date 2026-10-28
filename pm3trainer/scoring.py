@@ -1,5 +1,6 @@
 """Run scoring and best-time persistence."""
 import json
+import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -42,6 +43,15 @@ class HighScores:
         current = self.best()
         if current is not None and total >= current:
             return False
-        with open(self.path, "w", encoding="utf-8") as f:
-            json.dump({"best": float(total)}, f)
+        tmp_path = self.path + ".tmp"
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump({"best": float(total)}, f)
+            os.replace(tmp_path, self.path)
+        except OSError:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            return False
         return True

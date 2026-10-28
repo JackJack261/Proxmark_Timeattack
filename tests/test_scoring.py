@@ -65,3 +65,9 @@ def test_corrupt_file_is_treated_as_no_best(tmp_path):
     assert hs.best() is None
     assert hs.record(50.0) is True
     assert hs.best() == 50.0
+
+
+def test_record_tolerates_unwritable_path(tmp_path):
+    scores = HighScores(str(tmp_path / "missing_dir" / "scores.json"))
+    assert scores.record(50.0) is False
+    assert scores.best() is None

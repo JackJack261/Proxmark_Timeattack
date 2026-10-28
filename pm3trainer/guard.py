@@ -22,7 +22,7 @@ class GuardResult:
     reason: str
 
 
-_PASSWORD_FLAGS = ("-p", "--pwd")
+_PASSWORD_PREFIXES = ("-p", "--pwd")
 
 
 def _tokenize(cmd: str) -> list:
@@ -39,9 +39,9 @@ def _is_t55xx_read(tokens: list) -> bool:
 
 def _has_password_flag(tokens: list) -> bool:
     for token in tokens[3:]:
-        if token in _PASSWORD_FLAGS:
-            return True
-        if token.startswith("--pwd="):
+        # Prefix match also catches glued forms (-p11223344, --pwd=..., --pwd11223344).
+        # `lf t55xx read` has no other option starting with -p or --pwd.
+        if token.startswith(_PASSWORD_PREFIXES):
             return True
     return False
 

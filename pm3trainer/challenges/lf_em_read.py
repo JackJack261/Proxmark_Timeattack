@@ -7,8 +7,7 @@ from typing import Optional
 from pm3trainer.answers import norm_hex
 from pm3trainer.cards import CardKind
 from pm3trainer.challenges.base import Challenge, Mode
-
-WRITE_TEMPLATE = "lf em 410x clone --id {id}"
+from pm3trainer.challenges.lf_em_create import CLONE_TEMPLATE
 
 
 class LfEmRead(Challenge):
@@ -33,7 +32,7 @@ class LfEmRead(Challenge):
 
     def setup(self, session) -> None:
         self._truth = f"{self._rng.getrandbits(40):010x}"
-        session.run(WRITE_TEMPLATE.format(id=self._truth))
+        session.run(CLONE_TEMPLATE.format(id=self._truth))
 
     def check(self, session, player_input: Optional[str]) -> bool:
         if self._truth is None or player_input is None:

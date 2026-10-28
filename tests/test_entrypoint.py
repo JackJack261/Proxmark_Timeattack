@@ -62,3 +62,16 @@ def test_main_handles_keyboard_interrupt(monkeypatch, capsys):
     assert FakeSession.instances[0].closed
     assert "quit" in (out.out + out.err).lower()
     assert "Traceback" not in out.out + out.err
+
+
+def test_main_handles_eof(monkeypatch, capsys):
+    def eof(*args, **kwargs):
+        raise EOFError
+
+    monkeypatch.setattr(entry, "run_game", eof)
+    code = entry.main([])
+    out = capsys.readouterr()
+    assert code != 0
+    assert FakeSession.instances[0].closed
+    assert "quit" in (out.out + out.err).lower()
+    assert "Traceback" not in out.out + out.err

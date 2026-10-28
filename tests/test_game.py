@@ -95,7 +95,6 @@ class Harness:
             input_fn=self.input_fn,
             output_fn=self.output_fn,
             clock=self.clock,
-            scores=None,
         )
 
     @property
@@ -165,6 +164,39 @@ def test_read_challenge_setup_writes_and_checks_answer():
     assert results[0].elapsed == pytest.approx(8.0)
     assert "write 42" in session.sent
     assert "TASK-READ" in h.printed
+    # ground truth is written BEFORE the clock starts (first clock() call)
+    assert session.sent.index("write 42") < h.clock_calls[0]
+    assert "write 42" in session.sent[: h.clock_calls[0]]
+
+
+def test_read_setup_timeout_retries_before_clock():
+    raised = []
+
+    def on_cmd(cmd):
+        if cmd == "write 42" and not raised:
+            raised.append(True)
+            raise Pm3Timeout("slow")
+
+    session = FakeSession(make_responses(on_cmd=on_cmd))
+    h = Harness(session, ["", "", "42"], clock_values=[0.0, 8.0])
+    results = h.run([StubRead()])
+    assert len(results) == 1
+    assert raised == [True]
+    assert "timed out" in h.printed.lower()
+    assert "write 42" in session.sent[: h.clock_calls[0]]
+    assert session.sent.count("write 42") == 2
+
+
+def test_read_setup_disconnect_aborts_before_clock():
+    def on_cmd(cmd):
+        if cmd == "write 42":
+            raise Pm3Disconnected("gone")
+
+    session = FakeSession(make_responses(on_cmd=on_cmd))
+    h = Harness(session, [""])
+    with pytest.raises(GameAborted):
+        h.run([StubRead()])
+    assert h.clock_calls == []
 
 
 def test_timeout_is_recoverable():
