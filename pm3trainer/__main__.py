@@ -12,6 +12,7 @@ from pm3trainer.scoring import (
     total_seconds,
 )
 from pm3trainer.session import Pm3Disconnected, Pm3Session
+from pm3trainer.ui import show_title_screen
 
 SCORES_PATH = "scores.json"
 
@@ -44,6 +45,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        show_title_screen()
     session = Pm3Session(port=args.port)
     try:
         try:
