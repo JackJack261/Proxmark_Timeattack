@@ -15,9 +15,10 @@ from pm3trainer.game import GameAborted, build_challenges, run_game
 from pm3trainer.session import Pm3Disconnected, Pm3Timeout
 from pm3trainer.testing import FakeSession
 
-LF_SEARCH_OUT = "[+] Valid T55xx tag found\n"
+LF_SEARCH_OUT = "[+] Valid EM410x ID found!\n[+] Chipset... T55xx\n"
+LF_SEARCH_NONE = "[!] No known 125/134 kHz tags found\n"
 HF_SEARCH_OUT = "[+] ISO14443-a Information\n[+] Valid Mifare Classic tag found\n"
-T55_DETECT_OUT = "[=] Chip Type      : T55x7\n[=] Password set   : No\n"
+T55_DETECT_OUT = "[+] Chip type......... T55x7\n[+] Password set...... No\n"
 
 
 class StubCreate(Challenge):
@@ -49,17 +50,24 @@ class StubRead(Challenge):
         return player_input == "42"
 
 
-def make_responses(search=LF_SEARCH_OUT, on_cmd=None):
-    """Canned device: LF card present, 'write X' stores X, 'readback' returns it."""
+def make_responses(card=None, on_cmd=None):
+    """Canned device: T5577 present (unless `card['v']` is 'hf'), 'write X' stores X,
+    'readback' returns it. A wrong (HF) card flips to the T5577 after one failed check."""
     state = {"data": ""}
+    card = card if card is not None else {"v": "lf"}
 
     def respond(cmd):
         if on_cmd is not None:
             on_cmd(cmd)
-        if cmd == cards.SEARCH_CMD:
-            return search() if callable(search) else search
-        if cmd == cards.T5577_INFO_CMD:
-            return T55_DETECT_OUT
+        if cmd == cards.LF_SEARCH_CMD:
+            return LF_SEARCH_OUT if card["v"] == "lf" else LF_SEARCH_NONE
+        if cmd == cards.T5577_DETECT_CMD:
+            if card["v"] == "lf":
+                return T55_DETECT_OUT
+            card["v"] = "lf"  # the player swapped in the right card after the failure
+            return ""
+        if cmd == cards.HF_SEARCH_CMD:
+            return HF_SEARCH_OUT
         if cmd.startswith("write "):
             state["data"] = cmd[len("write "):]
             return "ok"
@@ -145,15 +153,14 @@ def test_guard_block_prevents_send_and_reloops():
 
 
 def test_wrong_card_reprompts_before_clock():
-    outputs = iter([HF_SEARCH_OUT, LF_SEARCH_OUT])
-    session = FakeSession(make_responses(search=lambda: next(outputs)))
+    session = FakeSession(make_responses(card={"v": "hf"}))
     h = Harness(session, ["", "", "write GOOD"], clock_values=[5.0, 9.0])
     results = h.run([StubCreate()])
     assert len(results) == 1
-    assert session.sent.count(cards.SEARCH_CMD) == 2
-    # clock() is first read only after both card checks (auto, auto, detect) ran
+    assert session.sent.count(cards.LF_SEARCH_CMD) == 2
+    # clock() is first read only after both card checks (lf search, detect, lf search) ran
     assert h.clock_calls[0] == 3
-    assert "HF" in h.printed  # the wrong-card detail was shown
+    assert "T5577" in h.printed  # the wrong-card detail was shown
 
 
 def test_read_challenge_setup_writes_and_checks_answer():
