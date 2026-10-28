@@ -58,6 +58,17 @@ output to verify results. Two challenge shapes share one opening:
 Clock stops on pass. Wrong answer or failed verify → **unlimited retries,
 clock keeps running** (time is the penalty). Fixed challenge order 1→6.
 
+At any command/answer prompt the player can instead type one of two reserved
+words:
+- **`hint`** — reveals the next hint for this challenge (hints are an ordered
+  list; the first is a nudge, the last is essentially the command with
+  placeholders). Each hint adds a **+30s** penalty. No cap beyond the list.
+- **`pass`** — gives up: reveals the challenge's solution, marks it skipped,
+  adds a **+180s** penalty, and moves on to the next challenge.
+
+`hint` and `pass` are matched case-insensitively on the trimmed input; no real
+`pm3` command or hex answer collides with them.
+
 ## Challenge lineup
 
 | # | Type | Challenge | Card | Player runs (example) | Verified by |
@@ -121,8 +132,12 @@ current card. Unknown state is treated as "no password" (default-deny).
   before the clock starts, so hunting for a card is not timed.
 - Clock starts when the task is revealed (CREATE) or after ground truth is
   written (READ); stops on pass.
-- Total = sum of all six challenge times.
-- End screen: per-challenge times + total, with pass markers.
+- **Penalties** add to a challenge's time: `HINT_PENALTY = 30` seconds per
+  hint used, `PASS_PENALTY = 180` seconds for a skip. A challenge's recorded
+  time = elapsed clock + (hints_used × 30) + (180 if skipped).
+- Total = sum of all six challenge times (including penalties).
+- End screen: per-challenge times + total, with pass markers, hints used, and
+  any skipped challenges called out.
 - **`scores.json`** in the program directory stores the player's best total
   time; the end screen reports whether this run beat it.
 
@@ -153,7 +168,6 @@ implementation on the device.
 ## Out of scope (v1)
 
 - Simulated / no-hardware mode.
-- Hint system.
 - Shuffled or difficulty-tiered challenge order.
 - More than the single command guard.
 - Multi-device support.
