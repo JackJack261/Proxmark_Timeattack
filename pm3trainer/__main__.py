@@ -4,6 +4,11 @@ import random
 import sys
 import time
 
+try:
+    import readline  # noqa: F401  (importing it enables arrow keys + history in input())
+except ImportError:
+    pass
+
 from pm3trainer.game import GameAborted, build_challenges, run_game
 from pm3trainer.scoring import (
     HINT_PENALTY,
@@ -12,7 +17,7 @@ from pm3trainer.scoring import (
     total_seconds,
 )
 from pm3trainer.session import Pm3Disconnected, Pm3Session
-from pm3trainer.ui import enter_key_fix, fullscreen, show_title_screen, wait_for_enter
+from pm3trainer.ui import enter_key_fix, fullscreen, show_title_screen
 
 SCORES_PATH = "scores.json"
 
@@ -101,12 +106,13 @@ def main(argv: list[str]) -> int:
     # fullscreen() restores the shell before any exception leaves this block,
     # so Ctrl-C at the title screen exits cleanly instead of dumping a traceback.
     try:
-        with enter_key_fix(), fullscreen():
-            show_title_screen()
-            code = _play(args)
-            if code != 130:  # the player didn't Ctrl-C out: let them read the screen
-                wait_for_enter()
-        return code
+        with enter_key_fix():
+            # The title screen is full-screen; leaving that block drops back to
+            # the normal terminal, so the game plays with scrollback and
+            # readline line-editing intact.
+            with fullscreen():
+                show_title_screen()
+            return _play(args)
     except (KeyboardInterrupt, EOFError):
         return 130
 

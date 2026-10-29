@@ -73,6 +73,20 @@ def _move(row: int, col: int) -> str:
     return f"\033[{row};{col}H"
 
 
+def format_challenge(text: str, width=None) -> str:
+    """Center (and wrap) the challenge text for a prominent, readable header."""
+    import textwrap
+
+    if width is None:
+        width = shutil.get_terminal_size(fallback=(80, 24)).columns
+    lines = []
+    for paragraph in text.splitlines() or [""]:
+        for line in textwrap.wrap(paragraph, max(width, 1)) or [""]:
+            lines.append(line.center(width))
+    body = "\n".join(lines)
+    return f"\n{ORANGE}{BOLD}{body}{RESET}\n"
+
+
 def _layout(cols: int, rows: int):
     """Compute 1-based positions for the title block and the prompt."""
     lines = build_title_lines()

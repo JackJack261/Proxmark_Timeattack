@@ -15,6 +15,7 @@ from pm3trainer.challenges.lf_em_read import LfEmRead
 from pm3trainer.challenges.lf_hid_create import LfHidCreate
 from pm3trainer.scoring import ChallengeResult
 from pm3trainer.session import Pm3Disconnected, Pm3Timeout
+from pm3trainer.ui import format_challenge
 
 PROMPT = "> "
 TIMEOUT_MESSAGE = "The Proxmark3 timed out. Try again."
@@ -119,7 +120,7 @@ def _play(session, challenge, *, input_fn, output_fn, clock) -> ChallengeResult:
     if challenge.mode is Mode.READ:
         _setup(session, challenge, input_fn, output_fn)
     start = clock()
-    output_fn(challenge.task_prompt)
+    output_fn(format_challenge(challenge.task_prompt))
 
     hints_used = 0
     skipped = False
@@ -139,7 +140,7 @@ def _play(session, challenge, *, input_fn, output_fn, clock) -> ChallengeResult:
             skipped = True
             break
         if word in SHOW_TASK_WORDS:
-            output_fn(challenge.task_prompt)
+            output_fn(format_challenge(challenge.task_prompt))
             continue
         if not line:
             continue
