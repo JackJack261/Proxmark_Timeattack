@@ -15,7 +15,10 @@ class HfMfRead(Challenge):
     mode = Mode.READ
     required_card = CardKind.MAGIC_MIFARE
     present_prompt = "Place a magic Mifare Classic card on the reader."
-    task_prompt = "The card now has a UID. Read it and type the UID."
+    task_prompt = (
+        "The card now has a UID. Run a pm3 read command to see it, "
+        "then type the UID."
+    )
 
     def __init__(self, rng: random.Random):
         self._rng = rng

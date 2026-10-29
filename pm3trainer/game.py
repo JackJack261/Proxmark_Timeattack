@@ -22,6 +22,37 @@ DISCONNECT_MESSAGE = (
     "Proxmark3 disconnected. Reconnect the device and restart the game."
 )
 
+# First word of a line that means "this is a pm3 command to run", not a READ
+# answer. Answers are bare hex IDs/UIDs, which never start with one of these.
+COMMAND_ROOTS = frozenset({
+    "lf", "hf", "data", "hw", "mem", "trace", "reveng", "analyse",
+    "script", "pref", "prefs", "emv", "smart", "nfc", "piv", "wiegand", "help",
+})
+
+
+def _looks_like_command(line: str) -> bool:
+    parts = line.split()
+    return bool(parts) and parts[0].lower() in COMMAND_ROOTS
+
+
+def _is_help(line: str) -> bool:
+    tokens = line.lower().split()
+    return (tokens[:1] == ["help"]) or "-h" in tokens or "--help" in tokens
+
+
+def _run_command(session, line, card_state, output_fn) -> bool:
+    """Guard, run a command on the device, and show its output.
+
+    Returns False if the guard blocked it (nothing was sent)."""
+    verdict = guard.check(line, card_state)
+    if not verdict.allowed:
+        output_fn(verdict.reason)
+        return False
+    output = session.run(line)
+    if output.strip():
+        output_fn(output)
+    return True
+
 
 class GameAborted(Exception):
     """The game cannot continue (device disconnected).
@@ -110,12 +141,18 @@ def _play(session, challenge, *, input_fn, output_fn, clock) -> ChallengeResult:
         challenge.feedback = ""
         try:
             if challenge.mode is Mode.CREATE:
-                verdict = guard.check(line, card_state)
-                if not verdict.allowed:
-                    output_fn(verdict.reason)
+                # Everything typed is a command: run it, show output, then
+                # check the card — except a help/usage query, which just shows.
+                if not _run_command(session, line, card_state, output_fn):
                     continue
-                session.run(line)
+                if _is_help(line):
+                    continue
                 passed = challenge.check(session, None)
+            elif _looks_like_command(line):
+                # READ: run the read command and show its output; the player
+                # reads the value off it and types it back as the answer next.
+                _run_command(session, line, card_state, output_fn)
+                continue
             else:
                 passed = challenge.check(session, line)
         except Pm3Timeout:

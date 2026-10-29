@@ -284,3 +284,39 @@ def test_pass_on_read_challenge_skips_after_setup():
     results = h.run([StubRead()])
     assert results[0].skipped is True
     assert "42" in h.printed
+
+
+def test_create_shows_command_output():
+    session = FakeSession(make_responses())
+    h = Harness(session, ["", "write GOOD"])
+    h.run([StubCreate()])
+    assert "ok" in h.out  # the command's device output is shown to the player
+    assert "Correct!" in h.printed
+
+
+def test_help_command_in_create_runs_without_checking_card():
+    seen = []
+    session = FakeSession(make_responses(on_cmd=seen.append))
+    h = Harness(session, ["", "lf hid -h", "write GOOD"])
+    h.run([StubCreate()])
+    # the card readback ran only after the real clone, not after '-h'
+    assert seen.count("readback") == 1
+
+
+def test_read_runs_command_and_shows_output_then_answer():
+    session = FakeSession(make_responses())
+    h = Harness(session, ["", "lf search", "42"])
+    results = h.run([StubRead()])
+    assert len(results) == 1
+    assert results[0].skipped is False
+    assert "340073B7A4" in h.printed  # the read command's output was shown
+    assert "Correct!" in h.printed
+
+
+def test_read_command_is_not_treated_as_answer():
+    session = FakeSession(make_responses())
+    h = Harness(session, ["", "lf search", "42"])
+    results = h.run([StubRead()])
+    # running 'lf search' must not count as submitting (and failing) an answer
+    assert "Not quite. Try again." not in h.printed
+    assert results[0].skipped is False

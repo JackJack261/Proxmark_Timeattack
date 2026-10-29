@@ -15,7 +15,10 @@ class LfEmRead(Challenge):
     mode = Mode.READ
     required_card = CardKind.T5577
     present_prompt = "Place a blank T5577 on the reader."
-    task_prompt = "The card now holds an EM410x ID. Read it and type the ID."
+    task_prompt = (
+        "The card now holds an EM410x ID. Run a pm3 read command to see it, "
+        "then type the ID."
+    )
 
     def __init__(self, rng: random.Random):
         self._rng = rng
