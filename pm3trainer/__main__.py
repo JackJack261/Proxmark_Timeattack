@@ -12,7 +12,7 @@ from pm3trainer.scoring import (
     total_seconds,
 )
 from pm3trainer.session import Pm3Disconnected, Pm3Session
-from pm3trainer.ui import fullscreen, show_title_screen, wait_for_enter
+from pm3trainer.ui import enter_key_fix, fullscreen, show_title_screen, wait_for_enter
 
 SCORES_PATH = "scores.json"
 
@@ -100,7 +100,7 @@ def main(argv: list[str]) -> int:
     # fullscreen() restores the shell before any exception leaves this block,
     # so Ctrl-C at the title screen exits cleanly instead of dumping a traceback.
     try:
-        with fullscreen():
+        with enter_key_fix(), fullscreen():
             show_title_screen()
             code = _play(args)
             if code != 130:  # the player didn't Ctrl-C out: let them read the screen

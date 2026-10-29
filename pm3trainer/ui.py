@@ -107,6 +107,33 @@ def fullscreen(stdout=None):
         stdout.flush()
 
 
+@contextlib.contextmanager
+def enter_key_fix(stdin=None):
+    """Make Enter terminate canonical input lines for the game's duration.
+
+    Some terminals deliver a bare carriage return with ICRNL off, so ``input()``
+    never completes (Enter echoes "^M" and reads hang). Turn ICRNL on (plus
+    canonical mode and echo) and restore the original settings on exit. No-op
+    where termios is unavailable (e.g. Windows) or stdin is not a tty.
+    """
+    stdin = stdin or sys.stdin
+    try:
+        import termios
+        fd = stdin.fileno()
+        old = termios.tcgetattr(fd)
+    except Exception:
+        yield
+        return
+    new = termios.tcgetattr(fd)
+    new[0] |= termios.ICRNL                    # iflag: map CR -> NL on input
+    new[3] |= termios.ICANON | termios.ECHO    # lflag: line mode + echo
+    try:
+        termios.tcsetattr(fd, termios.TCSANOW, new)
+        yield
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
 def wait_for_enter(message: str = EXIT_PROMPT, *, stdout=None, input_fn=input) -> None:
     """On a TTY, show a message and wait for Enter (so the last screen stays
     readable before the alternate buffer is torn down). No-op on a non-TTY."""
