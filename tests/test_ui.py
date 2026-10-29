@@ -50,3 +50,15 @@ def test_wait_for_enter_noop_on_non_tty():
     ui.wait_for_enter(stdout=out, input_fn=lambda: calls.append(True) or "")
     assert out.getvalue() == ""  # nothing drawn, nothing read
     assert calls == []
+
+
+def test_blink_wait_returns_when_enter_arrives():
+    # The reader thread's readline returns immediately (as pressing Enter does);
+    # _blink_wait must then return rather than loop forever.
+    import io
+
+    class FakeStdin:
+        def readline(self):
+            return "\n"
+
+    ui._blink_wait(io.StringIO(), FakeStdin(), 1, 1, 0.01)  # returns => no hang

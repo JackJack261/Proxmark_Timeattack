@@ -97,12 +97,17 @@ def main(argv: list[str]) -> int:
     if not interactive:
         return _play(args)
     # Hold the full-screen view across the whole game, not just the title.
-    with fullscreen():
-        show_title_screen()
-        code = _play(args)
-        if code != 130:  # the player didn't Ctrl-C out: let them read the screen
-            wait_for_enter()
-    return code
+    # fullscreen() restores the shell before any exception leaves this block,
+    # so Ctrl-C at the title screen exits cleanly instead of dumping a traceback.
+    try:
+        with fullscreen():
+            show_title_screen()
+            code = _play(args)
+            if code != 130:  # the player didn't Ctrl-C out: let them read the screen
+                wait_for_enter()
+        return code
+    except (KeyboardInterrupt, EOFError):
+        return 130
 
 
 if __name__ == "__main__":

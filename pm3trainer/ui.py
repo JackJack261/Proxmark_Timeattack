@@ -124,11 +124,24 @@ def wait_for_enter(message: str = EXIT_PROMPT, *, stdout=None, input_fn=input) -
 def _blink_wait(stdout, stdin, prompt_row, prompt_col, interval) -> None:
     """Blink the prompt until the player presses Enter.
 
-    Uses select() so the prompt keeps toggling while we wait for input, without
-    raw-mode fiddling. Falls back to a plain blocking read where select() on
-    stdin is not supported (e.g. Windows consoles).
+    A background thread does a normal blocking read for the Enter line (which
+    works wherever input() does), while this thread toggles the prompt. This
+    avoids select(), which does not reliably report tty input on every
+    terminal.
     """
-    import select
+    import threading
+
+    done = threading.Event()
+
+    def _await_enter():
+        try:
+            stdin.readline()
+        except Exception:
+            pass
+        finally:
+            done.set()
+
+    threading.Thread(target=_await_enter, daemon=True).start()
 
     visible = True
     while True:
@@ -139,13 +152,7 @@ def _blink_wait(stdout, stdin, prompt_row, prompt_col, interval) -> None:
             stdout.write(" " * len(PROMPT))
         stdout.write(_move(prompt_row, prompt_col))
         stdout.flush()
-        try:
-            ready, _, _ = select.select([stdin], [], [], interval)
-        except (OSError, ValueError):
-            stdin.readline()  # select unsupported here: just wait for Enter
-            return
-        if ready:
-            stdin.readline()
+        if done.wait(interval):  # Enter pressed
             return
         visible = not visible
 
