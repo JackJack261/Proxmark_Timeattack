@@ -54,3 +54,13 @@ def test_mode_and_card():
     c = _make()
     assert c.mode is Mode.CREATE
     assert c.required_card is CardKind.MAGIC_MIFARE
+
+
+def test_uid_keeps_nxp_manufacturer_first_byte():
+    import random
+    from pm3trainer.challenges.hf_mf_create import HfMfCreate, UID_MANUFACTURER_BYTE
+    for seed in range(50):
+        uid = HfMfCreate(random.Random(seed)).uid
+        assert len(uid) == 8
+        assert uid.startswith(UID_MANUFACTURER_BYTE)
+        assert not uid.startswith("88")  # never a cascade-tag first byte

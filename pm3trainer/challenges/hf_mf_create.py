@@ -12,6 +12,16 @@ from pm3trainer.parsers import parse_mifare_uid
 READ_COMMAND = "hf mf info"
 SET_UID_TEMPLATE = "hf mf csetuid -u {uid}"
 
+# A Mifare Classic 4-byte UID's first byte is the manufacturer code. Keep it
+# fixed to NXP (0x04) so the randomized UID is always a valid, readable Mifare
+# card -- a random first byte can clobber this (0x88 is read as a cascade tag).
+UID_MANUFACTURER_BYTE = "04"
+
+
+def random_mifare_uid(rng: random.Random) -> str:
+    """A random 4-byte UID (8 hex) with a valid NXP manufacturer first byte."""
+    return UID_MANUFACTURER_BYTE + f"{rng.getrandbits(24):06x}"
+
 
 class HfMfCreate(Challenge):
     name = "HF Mifare Classic create"
@@ -20,7 +30,7 @@ class HfMfCreate(Challenge):
     present_prompt = "Place a magic Mifare Classic card on the reader."
 
     def __init__(self, rng: random.Random):
-        self.uid = f"{rng.getrandbits(32):08x}"
+        self.uid = random_mifare_uid(rng)
         self.task_prompt = f"Set the UID of the magic Mifare Classic card to {self.uid}."
         self.hints = [
             "Mifare Classic is a high-frequency (hf) tag; look under 'hf mf' for a UID-changing command.",

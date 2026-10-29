@@ -60,3 +60,14 @@ def test_mode_and_card():
     c = _make()
     assert c.mode is Mode.READ
     assert c.required_card is CardKind.MAGIC_MIFARE
+
+
+def test_setup_uid_keeps_nxp_manufacturer_first_byte():
+    import random
+    from pm3trainer.challenges.hf_mf_create import UID_MANUFACTURER_BYTE
+    from pm3trainer.challenges.hf_mf_read import HfMfRead
+    from pm3trainer.testing import FakeSession
+    for seed in range(50):
+        c = HfMfRead(random.Random(seed))
+        c.setup(FakeSession({}))
+        assert len(c.solution) == 8 and c.solution.startswith(UID_MANUFACTURER_BYTE)

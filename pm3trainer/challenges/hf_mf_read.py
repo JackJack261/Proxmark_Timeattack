@@ -7,7 +7,7 @@ from typing import Optional
 from pm3trainer.answers import norm_hex
 from pm3trainer.cards import CardKind
 from pm3trainer.challenges.base import Challenge, Mode
-from pm3trainer.challenges.hf_mf_create import SET_UID_TEMPLATE
+from pm3trainer.challenges.hf_mf_create import SET_UID_TEMPLATE, random_mifare_uid
 
 
 class HfMfRead(Challenge):
@@ -34,7 +34,7 @@ class HfMfRead(Challenge):
         return self._truth if self._truth is not None else ""
 
     def setup(self, session) -> None:
-        self._truth = f"{self._rng.getrandbits(32):08x}"
+        self._truth = random_mifare_uid(self._rng)
         session.run(SET_UID_TEMPLATE.format(uid=self._truth))
 
     def check(self, session, player_input: Optional[str]) -> bool:
