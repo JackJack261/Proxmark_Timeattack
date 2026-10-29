@@ -121,14 +121,57 @@ def wait_for_enter(message: str = EXIT_PROMPT, *, stdout=None, input_fn=input) -
         pass
 
 
+def _draw_prompt(stdout, prompt_row, prompt_col, visible) -> None:
+    stdout.write(_move(prompt_row, prompt_col))
+    stdout.write((ORANGE + BOLD + PROMPT + RESET) if visible else " " * len(PROMPT))
+    stdout.write(_move(prompt_row, prompt_col))
+    stdout.flush()
+
+
 def _blink_wait(stdout, stdin, prompt_row, prompt_col, interval) -> None:
     """Blink the prompt until the player presses Enter.
 
-    A background thread does a normal blocking read for the Enter line (which
-    works wherever input() does), while this thread toggles the prompt. This
-    avoids select(), which does not reliably report tty input on every
-    terminal.
+    Reads the key directly in cbreak mode and treats CR or LF as Enter, so it
+    works even on terminals that deliver a bare carriage return and never
+    complete a canonical input line (the symptom: Enter echoes "^M" and
+    line-buffered reads hang). Falls back to a blocking readline where termios
+    is unavailable (e.g. Windows).
     """
+    import os
+    import select
+
+    try:
+        import termios
+        fd = stdin.fileno()
+        old = termios.tcgetattr(fd)
+    except Exception:
+        _blink_wait_readline(stdout, stdin, prompt_row, prompt_col, interval)
+        return
+
+    new = termios.tcgetattr(fd)
+    new[3] &= ~(termios.ICANON | termios.ECHO)  # raw-ish: per-key, no echo
+    new[6][termios.VMIN] = 1
+    new[6][termios.VTIME] = 0
+    try:
+        termios.tcsetattr(fd, termios.TCSANOW, new)
+        visible = True
+        while True:
+            _draw_prompt(stdout, prompt_row, prompt_col, visible)
+            ready, _, _ = select.select([fd], [], [], interval)
+            if ready:
+                ch = os.read(fd, 1)
+                if ch in (b"\r", b"\n"):
+                    while select.select([fd], [], [], 0)[0]:  # drain a paired CR/LF
+                        os.read(fd, 1)
+                    return
+            else:
+                visible = not visible
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
+def _blink_wait_readline(stdout, stdin, prompt_row, prompt_col, interval) -> None:
+    """Fallback for platforms without termios: blocking read on a thread."""
     import threading
 
     done = threading.Event()
@@ -142,17 +185,10 @@ def _blink_wait(stdout, stdin, prompt_row, prompt_col, interval) -> None:
             done.set()
 
     threading.Thread(target=_await_enter, daemon=True).start()
-
     visible = True
     while True:
-        stdout.write(_move(prompt_row, prompt_col))
-        if visible:
-            stdout.write(ORANGE + BOLD + PROMPT + RESET)
-        else:
-            stdout.write(" " * len(PROMPT))
-        stdout.write(_move(prompt_row, prompt_col))
-        stdout.flush()
-        if done.wait(interval):  # Enter pressed
+        _draw_prompt(stdout, prompt_row, prompt_col, visible)
+        if done.wait(interval):
             return
         visible = not visible
 
