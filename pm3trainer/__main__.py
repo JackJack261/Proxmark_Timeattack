@@ -20,6 +20,7 @@ INTRO = f"""\
 === Proxmark3 Time Attack ===
 Complete every challenge as fast as you can. The clock runs the whole time.
 Type 'hint' for a nudge (+{HINT_PENALTY:.0f}s) or 'pass' to skip a challenge (+{PASS_PENALTY:.0f}s).
+Type 'task' to see the current challenge again (no penalty).
 """
 
 

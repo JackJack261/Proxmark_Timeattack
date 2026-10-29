@@ -320,3 +320,13 @@ def test_read_command_is_not_treated_as_answer():
     # running 'lf search' must not count as submitting (and failing) an answer
     assert "Not quite. Try again." not in h.printed
     assert results[0].skipped is False
+
+
+def test_task_reprints_the_question_without_penalty():
+    session = FakeSession(make_responses())
+    h = Harness(session, ["", "task", "write GOOD"])
+    results = h.run([StubCreate()])
+    assert h.printed.count("TASK-CREATE") == 2  # shown at start and on 'task'
+    assert results[0].hints_used == 0
+    assert results[0].skipped is False
+    assert "task" not in session.sent  # never sent to the device

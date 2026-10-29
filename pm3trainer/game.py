@@ -24,6 +24,9 @@ DISCONNECT_MESSAGE = (
 
 # First word of a line that means "this is a pm3 command to run", not a READ
 # answer. Answers are bare hex IDs/UIDs, which never start with one of these.
+# Reserved words that reprint the current challenge task (no penalty).
+SHOW_TASK_WORDS = frozenset({"task", "question", "?"})
+
 COMMAND_ROOTS = frozenset({
     "lf", "hf", "data", "hw", "mem", "trace", "reveng", "analyse",
     "script", "pref", "prefs", "emv", "smart", "nfc", "piv", "wiegand", "help",
@@ -135,6 +138,9 @@ def _play(session, challenge, *, input_fn, output_fn, clock) -> ChallengeResult:
             output_fn(f"Solution: {challenge.solution}")
             skipped = True
             break
+        if word in SHOW_TASK_WORDS:
+            output_fn(challenge.task_prompt)
+            continue
         if not line:
             continue
 
